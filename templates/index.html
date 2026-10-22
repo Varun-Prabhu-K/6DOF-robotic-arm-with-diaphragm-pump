@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6-DOF Robotic Arm Controller</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-top: 4px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Connection Bar */
+    .connection-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      background: #0f172a;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--accent);
+    }
+
+    select {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    button {
+      background-color: #334155;
+      color: var(--text-main);
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #475569;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.btn-primary {
+      background-color: var(--accent);
+      color: #0f172a;
+    }
+
+    button.btn-primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+      color: #ffffff;
+    }
+
+    button.btn-danger {
+      background-color: var(--danger);
+      color: #ffffff;
+    }
+
+    button.btn-danger:hover:not(:disabled) {
+      background-color: #dc2626;
+    }
+
+    button.btn-success {
+      background-color: var(--success);
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    button.btn-success:hover:not(:disabled) {
+      background-color: #16a34a;
+      color: #ffffff;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #64748b;
+    }
+
+    .status-badge.connected .status-dot {
+      background-color: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .status-badge.disconnected .status-dot {
+      background-color: var(--danger);
+    }
+
+    /* Actions Grid */
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    /* Joints Section */
+    .joints-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .joint-card {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 160px 1fr 70px 80px;
+      align-items: center;
+      gap: 16px;
+    }
+
+    @media (max-width: 680px) {
+      .joint-card {
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+      }
+      .joint-card input[type="range"] {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .joint-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .joint-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .joint-number-input {
+      width: 65px;
+      text-align: center;
+      padding: 6px 8px;
+    }
+
+    /* Serial Monitor / Log */
+    .log-container {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 180px;
+      overflow-y: auto;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: #38bdf8;
+      white-space: pre-wrap;
+    }
+
+    .log-line-sent {
+      color: #a7f3d0;
+    }
+
+    .log-line-rx {
+      color: #fde047;
+    }
+
+    .log-line-err {
+      color: #f87171;
+    }
+
+    .log-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      align-items: center;
+    }
+
+    .raw-input-row {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .raw-input-row input {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>6-DOF Robotic Arm Control Dashboard</h1>
+      <p>Arduino UNO + PCA9685 Hardware Interface</p>
+    </header>
+
+    <!-- Connection Section -->
+    <section class="card">
+      <div class="card-title">
+        <span>Hardware Serial Connection</span>
+        <div id="connection-status" class="status-badge disconnected">
+          <span class="status-dot"></span>
+          <span id="status-text">Disconnected</span>
+        </div>
+      </div>
+      <div class="connection-row">
+        <select id="port-select">
+          <option value="">Searching ports...</option>
+        </select>
+        <button id="btn-refresh-ports" type="button">🔄 Refresh</button>
+        <button id="btn-connect" class="btn-primary" type="button">🔌 Connect</button>
+        <button id="btn-disconnect" class="btn-danger" type="button" style="display: none;">Disconnect</button>
+      </div>
+    </section>
+
+    <!-- Global Arm Actions -->
+    <section class="card">
+      <div class="card-title">Preset Commands</div>
+      <div class="actions-grid">
+        <button id="btn-center" type="button" class="btn-primary">🎯 Center All (90°)</button>
+        <button id="btn-pump-on" type="button" class="btn-success">⚡ Suction Pump ON</button>
+        <button id="btn-pump-off" type="button" class="btn-danger">⭕ Suction Pump OFF</button>
+      </div>
+    </section>
+
+    <!-- Joint Controls -->
+    <section class="card">
+      <div class="card-title">Joint Angle Controls (0° – 180°)</div>
+      <div class="joints-grid" id="joints-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- Serial Monitor / Log Panel -->
+    <section class="card">
+      <div class="card-title">
+        <span>Serial Monitor</span>
+        <button id="btn-clear-log" style="padding: 4px 10px; font-size: 0.8rem;">Clear</button>
+      </div>
+      <div id="log-box" class="log-container">Welcome to Robotic Arm Control. Connect your Arduino port to begin.</div>
+      <div class="log-controls">
+        <div class="raw-input-row">
+          <input type="text" id="raw-command-input" placeholder="Custom command (e.g. '0 =90', 'home', 'on', 'c')">
+          <button id="btn-send-raw" type="button">Send</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const JOINTS = [
+      { channel: 1, label: "J0", sub: "Channel 1", defaultAngle: 90 },
+      { channel: 2, label: "J1", sub: "Channel 2", defaultAngle: 90 },
+      { channel: 4, label: "J2", sub: "Channel 4", defaultAngle: 90 },
+      { channel: 0, label: "J3", sub: "Channel 0", defaultAngle: 90 },
+      { channel: 5, label: "J4", sub: "Channel 5", defaultAngle: 90 },
+      { channel: 3, label: "J5", sub: "Channel 3", defaultAngle: 90 }
+    ];
+
+    let isConnected = false;
+    let pollInterval = null;
+
+    const portSelect = document.getElementById("port-select");
+    const btnRefresh = document.getElementById("btn-refresh-ports");
+    const btnConnect = document.getElementById("btn-connect");
+    const btnDisconnect = document.getElementById("btn-disconnect");
+    const statusBadge = document.getElementById("connection-status");
+    const statusText = document.getElementById("status-text");
+    const logBox = document.getElementById("log-box");
+    const rawInput = document.getElementById("raw-command-input");
+    const btnSendRaw = document.getElementById("btn-send-raw");
+    const btnClearLog = document.getElementById("btn-clear-log");
+
+    function appendLog(text, type = "normal") {
+      const line = document.createElement("div");
+      if (type === "sent") line.className = "log-line-sent";
+      else if (type === "rx") line.className = "log-line-rx";
+      else if (type === "err") line.className = "log-line-err";
+
+      const time = new Date().toLocaleTimeString();
+      line.textContent = `[${time}] ${text}`;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function apiCall(endpoint, method = "GET", data = null) {
+      const options = {
+        method,
+        headers: { "Content-Type": "application/json" }
+      };
+      if (data) options.body = JSON.stringify(data);
+      const res = await fetch(endpoint, options);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.message || `Request failed with status ${res.status}`);
+      }
+      return body;
+    }
+
+    async function refreshPorts() {
+      try {
+        btnRefresh.disabled = true;
+        const ports = await apiCall("/api/ports");
+        portSelect.innerHTML = "";
+        if (ports.length === 0) {
+          portSelect.innerHTML = `<option value="">No COM ports detected</option>`;
+          appendLog("No serial ports found. Plug in your Arduino USB.", "err");
+        } else {
+          ports.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.device;
+            opt.textContent = `${p.device} (${p.description})`;
+            portSelect.appendChild(opt);
+          });
+          appendLog(`Detected ${ports.length} port(s): ${ports.map(p => p.device).join(", ")}`);
+        }
+      } catch (err) {
+        appendLog(`Error refreshing ports: ${err.message}`, "err");
+      } finally {
+        btnRefresh.disabled = false;
+      }
+    }
+
+    function setConnectedUI(connected, port = "") {
+      isConnected = connected;
+      if (connected) {
+        statusBadge.className = "status-badge connected";
+        statusText.textContent = `Connected: ${port}`;
+        btnConnect.style.display = "none";
+        btnDisconnect.style.display = "inline-flex";
+        portSelect.disabled = true;
+        btnRefresh.disabled = true;
+        if (!pollInterval) {
+          pollInterval = setInterval(pollArduinoResponses, 500);
+        }
+      } else {
+        statusBadge.className = "status-badge disconnected";
+        statusText.textContent = "Disconnected";
+        btnConnect.style.display = "inline-flex";
+        btnDisconnect.style.display = "none";
+        btnConnect.disabled = false;
+        portSelect.disabled = false;
+        btnRefresh.disabled = false;
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+      }
+    }
+
+    async function connectPort() {
+      const port = portSelect.value;
+      if (!port) {
+        alert("Please select a COM port first.");
+        return;
+      }
+      btnConnect.disabled = true;
+      btnConnect.textContent = "Connecting...";
+      appendLog(`Connecting to ${port}...`);
+
+      try {
+        const res = await apiCall("/api/connect", "POST", { port });
+        appendLog(res.message, "sent");
+        setConnectedUI(true, port);
+      } catch (err) {
+        appendLog(`Connection failed: ${err.message}`, "err");
+        setConnectedUI(false);
+      } finally {
+        btnConnect.textContent = "🔌 Connect";
+      }
+    }
+
+    async function disconnectPort() {
+      try {
+        const res = await apiCall("/api/disconnect", "POST");
+        appendLog(res.message);
+      } catch (err) {
+        appendLog(`Disconnect error: ${err.message}`, "err");
+      } finally {
+        setConnectedUI(false);
+      }
+    }
+
+    function setJointUI(channel, angle) {
+      const slider = document.getElementById(`slider-joint-${channel}`);
+      const numInput = document.getElementById(`input-joint-${channel}`);
+      if (slider) {
+        slider.value = angle;
+      }
+      if (numInput) {
+        numInput.value = angle;
+      }
+    }
+
+    function resetSlidersToAngle(angle = 90) {
+      for (let ch = 0; ch < 6; ch++) {
+        setJointUI(ch, angle);
+      }
+    }
+
+    async function sendJointCommand(channel, angle) {
+      if (!isConnected) {
+        alert("Please connect to Arduino first!");
+        return;
+      }
+      try {
+        const res = await apiCall("/api/command", "POST", {
+          kind: "joint",
+          channel: Number(channel),
+          angle: Number(angle)
+        });
+        appendLog(`>> Sent: ${res.sent}`, "sent");
+        setJointUI(channel, angle);
+      } catch (err) {
+        appendLog(`Command error: ${err.message}`, "err");
+      }
+    }
+
+    async function sendActionCommand(action) {
+      if (!isConnected) {
+        alert("Please connect to Arduino first!");
+        return;
+      }
+      if (action === "c" || action === "home") {
+        resetSlidersToAngle(90);
+      }
+      try {
+        const res = await apiCall("/api/command", "POST", {
+          kind: "action",
+          action
+        });
+        appendLog(`>> Action: ${res.sent}`, "sent");
+      } catch (err) {
+        appendLog(`Action error: ${err.message}`, "err");
+      }
+    }
+
+    async function sendRawCommand() {
+      const cmd = rawInput.value.trim();
+      if (!cmd) return;
+      if (!isConnected) {
+        alert("Please connect to Arduino first!");
+        return;
+      }
+      try {
+        const res = await apiCall("/api/command", "POST", {
+          kind: "raw",
+          command: cmd
+        });
+        appendLog(`>> Raw: ${res.sent}`, "sent");
+        rawInput.value = "";
+
+        const lower = cmd.toLowerCase();
+        if (lower === "c" || lower === "home") {
+          resetSlidersToAngle(90);
+        } else {
+          const match = cmd.match(/^(\d+)\s*=\s*(\d+)$/);
+          if (match) {
+            const ch = parseInt(match[1], 10);
+            const ang = parseInt(match[2], 10);
+            if (ch >= 0 && ch < 6 && ang >= 0 && ang <= 180) {
+              setJointUI(ch, ang);
+            }
+          }
+        }
+      } catch (err) {
+        appendLog(`Command error: ${err.message}`, "err");
+      }
+    }
+
+    async function pollArduinoResponses() {
+      if (!isConnected) return;
+      try {
+        const res = await apiCall("/api/response");
+        if (res.connected === false && isConnected) {
+          setConnectedUI(false);
+          appendLog("Arduino disconnected unexpectedly.", "err");
+          return;
+        }
+        if (res.lines && res.lines.length > 0) {
+          res.lines.forEach(line => {
+            appendLog(`<< ${line}`, "rx");
+
+            // Keep UI sliders synchronized with Arduino reports
+            if (line.includes("ALL SERVOS AT 90 DEGREES") ||
+                line.includes("HOME POSITION REACHED") ||
+                line.includes("CENTERING ALL SERVOS") ||
+                line.includes("GOING TO HOME POSITION")) {
+              resetSlidersToAngle(90);
+            }
+            const match = line.match(/CHANNEL\s+(\d+)\s*:\s*\d+\s*->\s*(\d+)/);
+            if (match) {
+              const ch = parseInt(match[1], 10);
+              const ang = parseInt(match[2], 10);
+              setJointUI(ch, ang);
+            }
+          });
+        }
+      } catch (err) {
+        // Silently ignore temporary poll hiccups
+      }
+    }
+
+    // Render Joint Sliders
+    function initJoints() {
+      const container = document.getElementById("joints-container");
+      container.innerHTML = "";
+
+      JOINTS.forEach(j => {
+        const row = document.createElement("div");
+        row.className = "joint-card";
+        row.innerHTML = `
+          <div>
+            <div class="joint-name">${j.label}</div>
+            <div class="joint-sub">${j.sub}</div>
+          </div>
+          <input type="range" id="slider-joint-${j.channel}" min="0" max="180" value="${j.defaultAngle}">
+          <input type="number" id="input-joint-${j.channel}" class="joint-number-input" min="0" max="180" value="${j.defaultAngle}">
+          <button id="btn-move-${j.channel}" type="button" class="btn-primary">Move</button>
+        `;
+
+        container.appendChild(row);
+
+        const slider = row.querySelector(`#slider-joint-${j.channel}`);
+        const numInput = row.querySelector(`#input-joint-${j.channel}`);
+        const btnMove = row.querySelector(`#btn-move-${j.channel}`);
+
+        slider.addEventListener("input", (e) => {
+          numInput.value = e.target.value;
+        });
+
+        numInput.addEventListener("input", (e) => {
+          let val = Math.max(0, Math.min(180, Number(e.target.value) || 0));
+          slider.value = val;
+        });
+
+        // Send when Move button clicked
+        btnMove.addEventListener("click", () => {
+          sendJointCommand(j.channel, slider.value);
+        });
+
+        // Also send when slider is released after dragging
+        slider.addEventListener("change", () => {
+          sendJointCommand(j.channel, slider.value);
+        });
+      });
+    }
+
+    // Event listeners
+    btnRefresh.addEventListener("click", refreshPorts);
+    btnConnect.addEventListener("click", connectPort);
+    btnDisconnect.addEventListener("click", disconnectPort);
+    btnClearLog.addEventListener("click", () => { logBox.innerHTML = ""; });
+    btnSendRaw.addEventListener("click", sendRawCommand);
+    rawInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendRawCommand();
+    });
+
+    document.getElementById("btn-center").addEventListener("click", () => {
+      resetSlidersToAngle(90);
+      sendActionCommand("c");
+    });
+    document.getElementById("btn-pump-on").addEventListener("click", () => sendActionCommand("on"));
+    document.getElementById("btn-pump-off").addEventListener("click", () => sendActionCommand("off"));
+
+    // Check initial status on load
+    async function init() {
+      initJoints();
+      await refreshPorts();
+      try {
+        const status = await apiCall("/api/status");
+        if (status.connected) {
+          setConnectedUI(true, status.port);
+          appendLog(`Already connected to ${status.port}`);
+        }
+      } catch (e) {}
+    }
+
+    init();
+  </script>
+</body>
+</html>
